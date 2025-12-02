@@ -4,16 +4,39 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>STEP File Viewer & GPU Stats</title>
+    <title>CAD WebGL Viewer</title>
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Mono:ital,wght@0,400;0,700;1,400&display=swap"
+        rel="stylesheet">
+
+    <!-- Icons -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+
     <style>
+        :root {
+            --primary: #ff006e;
+            --secondary: #8338ec;
+            --bg-dark: #0a0a0a;
+            --glass-bg: rgba(20, 20, 20, 0.6);
+            --glass-border: rgba(255, 255, 255, 0.1);
+            --text-main: #ffffff;
+            --text-muted: rgba(255, 255, 255, 0.6);
+        }
+
         body {
             margin: 0;
             overflow: hidden;
-            background: linear-gradient(135deg, #0a0a0a 0%, #1a0a1a 100%);
-            font-family: 'Inter', system-ui, -apple-system, sans-serif;
-            color: white;
+            background: linear-gradient(135deg, #050505 0%, #1a1a1a 100%);
+            font-family: 'Inter', sans-serif;
+            color: var(--text-main);
+            -webkit-font-smoothing: antialiased;
         }
 
+        /* Canvas */
         #canvas-container {
             width: 100vw;
             height: 100vh;
@@ -23,324 +46,483 @@
             z-index: 1;
         }
 
+        /* UI Panels Common Styles */
+        .ui-panel {
+            background: var(--glass-bg);
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+            border: 1px solid var(--glass-border);
+            border-radius: 16px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+            padding: 20px;
+            transition: all 0.3s ease;
+        }
+
+        .ui-panel:hover {
+            border-color: rgba(255, 0, 110, 0.3);
+            box-shadow: 0 8px 40px rgba(255, 0, 110, 0.15);
+        }
+
+        /* Header / Title */
+        h1 {
+            margin: 0 0 16px 0;
+            font-size: 1.1rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: var(--text-main);
+        }
+
+        h1 i {
+            color: var(--primary);
+            font-size: 1.4rem;
+        }
+
+        /* Top Left: System Stats */
         #ui-layer {
             position: absolute;
-            top: 20px;
-            left: 20px;
-            z-index: 2;
-            background: rgba(255, 255, 255, 0.08);
-            backdrop-filter: blur(20px);
-            padding: 24px;
-            border-radius: 20px;
-            border: 1px solid rgba(255, 0, 110, 0.3);
-            box-shadow: 0 8px 32px 0 rgba(255, 0, 110, 0.2);
-            max-width: 350px;
-            pointer-events: none;
+            top: 24px;
+            left: 24px;
+            z-index: 10;
+            width: 300px;
         }
 
-        #controls-layer {
-            position: absolute;
-            bottom: 30px;
-            left: 50%;
-            transform: translateX(-50%);
-            z-index: 3;
-            background: rgba(0, 0, 0, 0.7);
-            backdrop-filter: blur(20px);
-            padding: 15px 25px;
-            border-radius: 30px;
-            border: 1px solid rgba(255, 0, 110, 0.3);
+        .stat-group {
             display: flex;
-            gap: 15px;
-            align-items: center;
-            flex-wrap: wrap;
-            justify-content: center;
-        }
-
-        .material-controls {
-            display: flex;
-            gap: 10px;
-            align-items: center;
-            padding: 8px 15px;
-            background: rgba(255, 255, 255, 0.05);
-            border-radius: 20px;
-            border: 1px solid rgba(255, 0, 110, 0.2);
-        }
-
-        .material-controls label {
-            font-size: 0.8rem;
-            color: rgba(255, 255, 255, 0.7);
-            font-weight: 500;
-        }
-
-        .material-controls select {
-            background: rgba(0, 0, 0, 0.5);
-            color: #fff;
-            border: 1px solid rgba(255, 0, 110, 0.3);
-            border-radius: 8px;
-            padding: 6px 12px;
-            font-size: 0.85rem;
-            cursor: pointer;
-            outline: none;
-        }
-
-        .material-controls select:hover {
-            border-color: #ff006e;
-        }
-
-        .material-controls input[type="color"] {
-            width: 40px;
-            height: 40px;
-            border: 2px solid rgba(255, 0, 110, 0.3);
-            border-radius: 50%;
-            cursor: pointer;
-            background: none;
-            outline: none;
-        }
-
-        .material-controls input[type="color"]:hover {
-            border-color: #ff006e;
-        }
-
-        #controls-hint {
-            position: absolute;
-            top: 20px;
-            right: 20px;
-            z-index: 2;
-            background: rgba(255, 255, 255, 0.08);
-            backdrop-filter: blur(20px);
-            padding: 18px;
-            border-radius: 16px;
-            border: 1px solid rgba(255, 0, 110, 0.3);
-            font-size: 0.85rem;
-            max-width: 220px;
-        }
-
-        h1 {
-            margin: 0 0 12px 0;
-            font-size: 1.3rem;
-            font-weight: 700;
-            background: linear-gradient(135deg, #ff006e, #8338ec);
-            -webkit-background-clip: text;
-            background-clip: text;
-            -webkit-text-fill-color: transparent;
-            letter-spacing: -0.5px;
+            flex-direction: column;
+            gap: 12px;
         }
 
         .stat-item {
-            margin-bottom: 10px;
-            font-size: 0.9rem;
-            line-height: 1.5;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.85rem;
         }
 
-        .label {
-            color: rgba(255, 255, 255, 0.5);
-            font-size: 0.75rem;
-            display: block;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            font-weight: 600;
-        }
-
-        .value {
+        .stat-label {
+            color: var(--text-muted);
             font-weight: 500;
-            color: #fff;
-            margin-top: 2px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .stat-label i {
+            color: var(--primary);
+            opacity: 0.8;
+        }
+
+        .stat-value {
+            font-family: 'Space Mono', monospace;
+            font-weight: 400;
+            color: var(--text-main);
+            background: rgba(255, 255, 255, 0.05);
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.8rem;
         }
 
         .status-indicator {
-            display: inline-block;
-            width: 10px;
-            height: 10px;
+            width: 8px;
+            height: 8px;
             border-radius: 50%;
             background-color: #ff4444;
-            margin-right: 8px;
+            display: inline-block;
+            margin-right: 6px;
         }
 
         .status-active {
-            background-color: #ff006e;
-            box-shadow: 0 0 15px #ff006e;
-            animation: pulse 2s ease-in-out infinite;
+            background-color: var(--primary);
+            box-shadow: 0 0 10px var(--primary);
+            animation: pulse 2s infinite;
         }
 
         @keyframes pulse {
+            0% {
+                opacity: 1;
+                box-shadow: 0 0 0 0 rgba(255, 0, 110, 0.4);
+            }
 
-            0%,
+            70% {
+                opacity: 1;
+                box-shadow: 0 0 0 6px rgba(255, 0, 110, 0);
+            }
+
             100% {
                 opacity: 1;
+                box-shadow: 0 0 0 0 rgba(255, 0, 110, 0);
             }
+        }
 
-            50% {
-                opacity: 0.6;
-            }
+        /* Top Right: Controls Hint */
+        #controls-hint {
+            position: absolute;
+            top: 24px;
+            right: 24px;
+            z-index: 10;
+            width: 200px;
+        }
+
+        .control-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .control-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+
+        .control-item i {
+            color: var(--primary);
+            font-size: 1.1rem;
+            width: 20px;
+            text-align: center;
+        }
+
+        .control-item strong {
+            color: var(--text-main);
+            font-weight: 600;
+        }
+
+        /* Bottom Center: Action Bar */
+        #controls-layer {
+            position: absolute;
+            bottom: 40px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 20;
+            display: flex;
+            gap: 16px;
+            align-items: center;
+            padding: 12px 20px;
+            border-radius: 50px;
+            /* Pill shape */
+        }
+
+        /* File Upload Button */
+        .custom-file-upload {
+            background: rgba(255, 0, 110, 0.1);
+            border: 1px solid rgba(255, 0, 110, 0.4);
+            color: var(--primary);
+            padding: 10px 24px;
+            border-radius: 30px;
+            font-weight: 600;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .custom-file-upload:hover {
+            background: var(--primary);
+            color: white;
+            box-shadow: 0 4px 20px rgba(255, 0, 110, 0.4);
+            transform: translateY(-2px);
         }
 
         input[type="file"] {
             display: none;
         }
 
-        .custom-file-upload {
-            border: 2px solid #ff006e;
-            display: inline-block;
-            padding: 12px 24px;
-            cursor: pointer;
-            border-radius: 30px;
-            font-size: 0.95rem;
-            font-weight: 600;
-            color: #ff006e;
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            background: rgba(255, 0, 110, 0.1);
-            letter-spacing: 0.3px;
+        /* Separator */
+        .separator {
+            width: 1px;
+            height: 24px;
+            background: rgba(255, 255, 255, 0.1);
         }
 
-        .custom-file-upload:hover {
-            background: linear-gradient(135deg, #ff006e, #8338ec);
-            color: #fff;
-            transform: translateY(-2px);
-            box-shadow: 0 8px 25px rgba(255, 0, 110, 0.4);
-        }
-
-        #loading-overlay {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.85);
-            z-index: 10;
+        /* Material Controls */
+        .control-group {
             display: flex;
-            justify-content: center;
             align-items: center;
-            flex-direction: column;
-            display: none;
+            gap: 12px;
         }
 
-        .spinner {
-            width: 50px;
-            height: 50px;
-            border: 4px solid rgba(255, 255, 255, 0.1);
-            border-top: 4px solid #ff006e;
+        .control-group label {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--text-muted);
+            font-weight: 600;
+        }
+
+        select {
+            background: rgba(0, 0, 0, 0.4);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: var(--text-main);
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-family: 'Space Mono', monospace;
+            font-size: 0.8rem;
+            cursor: pointer;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        select:hover,
+        select:focus {
+            border-color: var(--primary);
+        }
+
+        input[type="color"] {
+            width: 36px;
+            height: 36px;
+            border: none;
             border-radius: 50%;
-            animation: spin 0.8s linear infinite;
-            margin-bottom: 20px;
+            background: none;
+            cursor: pointer;
+            padding: 0;
+            transition: transform 0.2s;
         }
 
-        @keyframes spin {
-            0% {
-                transform: rotate(0deg);
-            }
-
-            100% {
-                transform: rotate(360deg);
-            }
+        input[type="color"]::-webkit-color-swatch-wrapper {
+            padding: 0;
         }
 
+        input[type="color"]::-webkit-color-swatch {
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            border-radius: 50%;
+        }
+
+        input[type="color"]:hover {
+            transform: scale(1.1);
+        }
+
+        /* Bottom Left: Logs */
         #logs-console {
             position: absolute;
-            bottom: 10px;
-            left: 10px;
-            width: 420px;
-            max-height: 220px;
-            background: rgba(0, 0, 0, 0.9);
-            color: #ff006e;
-            font-family: 'Consolas', 'Monaco', monospace;
-            font-size: 11px;
-            overflow: hidden;
-            padding: 12px;
-            border-radius: 12px;
-            pointer-events: auto;
-            z-index: 100;
+            bottom: 24px;
+            left: 24px;
+            width: 350px;
+            max-height: 200px;
+            z-index: 10;
             display: none;
-            border: 1px solid rgba(255, 0, 110, 0.3);
+            font-family: 'Space Mono', monospace;
+            font-size: 0.75rem;
+        }
+
+        .logs-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            padding-bottom: 8px;
+        }
+
+        .logs-title {
+            color: var(--primary);
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            font-size: 0.8rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .close-btn {
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            cursor: pointer;
+            font-size: 1.1rem;
+            transition: color 0.2s;
+        }
+
+        .close-btn:hover {
+            color: white;
         }
 
         #logs-content {
-            max-height: 180px;
+            max-height: 150px;
             overflow-y: auto;
+            color: var(--text-muted);
+            line-height: 1.6;
+            scrollbar-width: none;
+            /* Firefox */
         }
 
         #logs-content::-webkit-scrollbar {
             display: none;
         }
 
-        #logs-content {
-            -ms-overflow-style: none;
-            scrollbar-width: none;
+        /* Chrome/Safari */
+
+        .log-entry {
+            margin-bottom: 4px;
+            border-left: 2px solid transparent;
+            padding-left: 8px;
+        }
+
+        .log-info {
+            border-left-color: var(--primary);
+        }
+
+        .log-warn {
+            border-left-color: #ffaa00;
+            color: #ffcc00;
+        }
+
+        .log-error {
+            border-left-color: #ff4444;
+            color: #ff6666;
+        }
+
+        /* Loading Overlay */
+        #loading-overlay {
+            position: absolute;
+            inset: 0;
+            background: rgba(5, 5, 5, 0.9);
+            backdrop-filter: blur(10px);
+            z-index: 100;
+            display: none;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+        }
+
+        .spinner {
+            width: 60px;
+            height: 60px;
+            border: 3px solid rgba(255, 0, 110, 0.1);
+            border-top-color: var(--primary);
+            border-radius: 50%;
+            animation: spin 1s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+            margin-bottom: 24px;
+        }
+
+        #loading-text {
+            font-family: 'Space Mono', monospace;
+            font-size: 1rem;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            color: var(--primary);
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        /* File Name Display */
+        #file-name {
+            position: absolute;
+            bottom: -30px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-family: 'Space Mono', monospace;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            white-space: nowrap;
         }
     </style>
 </head>
 
 <body>
-    <div id="ui-layer">
-        <h1>GPU & STEP Viewer</h1>
-        <div class="stat-item">
-            <span class="label">Status</span>
-            <div style="display: flex; align-items: center; margin-top: 4px;">
-                <span id="status-dot" class="status-indicator"></span>
-                <span id="status-text" class="value">Initializing...</span>
+    <!-- Top Left: System Stats -->
+    <div id="ui-layer" class="ui-panel">
+        <h1><i class="ph-fill ph-cube-transparent"></i> CAD Viewer</h1>
+        <div class="stat-group">
+            <div class="stat-item">
+                <span class="stat-label"><i class="ph ph-activity"></i> Status</span>
+                <div style="display: flex; align-items: center;">
+                    <span id="status-dot" class="status-indicator"></span>
+                    <span id="status-text" class="stat-value" style="background:none; padding:0;">Init...</span>
+                </div>
+            </div>
+            <div class="stat-item">
+                <span class="stat-label"><i class="ph ph-cpu"></i> Renderer</span>
+                <span id="gpu-renderer" class="stat-value" title="Full Renderer String">Detecting...</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-label"><i class="ph ph-factory"></i> Vendor</span>
+                <span id="gpu-vendor" class="stat-value">Detecting...</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-label"><i class="ph ph-gauge"></i> FPS</span>
+                <span id="fps-counter" class="stat-value">0</span>
             </div>
         </div>
-        <div class="stat-item">
-            <span class="label">GPU Renderer</span>
-            <span id="gpu-renderer" class="value" style="cursor: help;"
-                title="Hover for full renderer string">Detecting...</span>
-        </div>
-        <div class="stat-item">
-            <span class="label">Vendor</span>
-            <span id="gpu-vendor" class="value">Detecting...</span>
-        </div>
-        <div class="stat-item">
-            <span class="label">FPS</span>
-            <span id="fps-counter" class="value">0</span>
-        </div>
     </div>
 
-    <div id="controls-hint">
+    <!-- Top Right: Controls Hint -->
+    <div id="controls-hint" class="ui-panel">
         <div
-            style="font-weight: 700; margin-bottom: 10px; background: linear-gradient(135deg, #ff006e, #8338ec); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;">
-            Controls</div>
-        <div style="margin-bottom: 6px; font-size: 0.8rem;">🖱️ <strong>Left Drag:</strong> Rotate</div>
-        <div style="margin-bottom: 6px; font-size: 0.8rem;">🖱️ <strong>Right Drag:</strong> Pan</div>
-        <div style="margin-bottom: 6px; font-size: 0.8rem;">🖱️ <strong>Middle Drag:</strong> Zoom</div>
-        <div style="font-size: 0.8rem;">🖱️ <strong>Scroll:</strong> Zoom In/Out</div>
+            style="margin-bottom: 12px; font-weight: 600; color: var(--primary); text-transform: uppercase; letter-spacing: 1px; font-size: 0.8rem; display: flex; align-items: center; gap: 8px;">
+            <i class="ph ph-game-controller"></i> Controls
+        </div>
+        <div class="control-list">
+            <div class="control-item"><i class="ph ph-mouse-left-click"></i> <span><strong>Rotate</strong> (Drag)</span>
+            </div>
+            <div class="control-item"><i class="ph ph-mouse-right-click"></i> <span><strong>Pan</strong> (Drag)</span>
+            </div>
+            <div class="control-item"><i class="ph ph-mouse-middle-click"></i> <span><strong>Zoom</strong> (Drag)</span>
+            </div>
+            <div class="control-item"><i class="ph ph-mouse-scroll"></i> <span><strong>Zoom</strong> (Scroll)</span>
+            </div>
+        </div>
     </div>
 
-    <div id="controls-layer">
+    <!-- Bottom Center: Main Controls -->
+    <div id="controls-layer" class="ui-panel">
         <label for="file-upload" class="custom-file-upload">
-            📂 Open STEP File
+            <i class="ph ph-upload-simple"></i> Open STEP
         </label>
         <input id="file-upload" type="file" accept=".step,.stp" />
-        <span id="file-name" style="font-size: 0.85rem; color: rgba(255,255,255,0.6);">No file selected</span>
 
-        <div class="material-controls">
-            <label for="material-type">Material:</label>
+        <div class="separator"></div>
+
+        <div class="control-group">
+            <label><i class="ph ph-paint-bucket"></i> Material</label>
             <select id="material-type">
                 <option value="normal">Normal (Rainbow)</option>
-                <option value="standard">Standard</option>
-                <option value="phong">Phong</option>
-                <option value="lambert">Lambert</option>
+                <option value="standard">Standard PBR</option>
+                <option value="phong">Phong (Shiny)</option>
+                <option value="lambert">Lambert (Matte)</option>
                 <option value="wireframe">Wireframe</option>
             </select>
         </div>
 
-        <div class="material-controls">
-            <label for="model-color">Color:</label>
+        <div class="control-group">
+            <label><i class="ph ph-palette"></i> Color</label>
             <input type="color" id="model-color" value="#ff006e" />
         </div>
+
+        <span id="file-name">No file loaded</span>
     </div>
 
-    <div id="loading-overlay">
-        <div class="spinner"></div>
-        <div id="loading-text" style="font-size: 1.1rem; font-weight: 500;">Processing STEP file...</div>
-    </div>
-
-    <div id="logs-console">
-        <div style="margin-bottom: 8px;"><strong style="color: #8338ec;">Logs</strong> <button
-                onclick="document.getElementById('logs-console').style.display='none'"
-                style="float:right; cursor:pointer; background:none; border:none; color:#fff; font-size: 16px;">✕</button>
+    <!-- Bottom Left: Logs -->
+    <div id="logs-console" class="ui-panel">
+        <div class="logs-header">
+            <span class="logs-title"><i class="ph ph-terminal-window"></i> System Logs</span>
+            <button class="close-btn" onclick="document.getElementById('logs-console').style.display='none'"><i
+                    class="ph ph-x"></i></button>
         </div>
         <div id="logs-content"></div>
     </div>
 
+    <!-- Loading Overlay -->
+    <div id="loading-overlay">
+        <div class="spinner"></div>
+        <div id="loading-text">Processing Geometry...</div>
+    </div>
+
+    <!-- 3D Canvas -->
     <div id="canvas-container"></div>
 
     <script type="importmap">
@@ -362,18 +544,19 @@
         function logToScreen(msg, type = 'info') {
             logsConsole.style.display = 'block';
             const div = document.createElement('div');
-            div.style.color = type === 'error' ? '#ff4444' : (type === 'warn' ? '#ffaa00' : '#ff006e');
-            div.style.marginBottom = '6px';
-            div.style.paddingBottom = '6px';
-            div.style.borderBottom = '1px solid rgba(255,255,255,0.1)';
-            div.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+            div.className = `log-entry log-${type}`;
+
+            // Format time nicely
+            const time = new Date().toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            div.textContent = `[${time}] ${msg}`;
+
             logsContent.appendChild(div);
             logsContent.scrollTop = logsContent.scrollHeight;
             console.log(msg);
         }
 
         window.onerror = function (msg, url, lineNo, columnNo, error) {
-            logToScreen(`Global Error: ${msg} at line ${lineNo}`, 'error');
+            logToScreen(`Error: ${msg}`, 'error');
             return false;
         };
 
@@ -382,7 +565,7 @@
         async function initOCCT() {
             if (occt) return occt;
 
-            logToScreen("Initializing OCCT...");
+            logToScreen("Initializing OCCT Kernel...");
 
             const script = document.createElement('script');
             script.src = "https://cdn.jsdelivr.net/npm/occt-import-js@0.0.16/dist/occt-import-js.js";
@@ -390,7 +573,7 @@
 
             return new Promise((resolve, reject) => {
                 script.onload = () => {
-                    logToScreen("OCCT script loaded. Initializing WASM...");
+                    logToScreen("Kernel loaded. Booting WASM...");
                     occtimportjs({
                         locateFile: (name) => {
                             if (name.endsWith('.wasm')) {
@@ -400,15 +583,15 @@
                         }
                     }).then((instance) => {
                         occt = instance;
-                        logToScreen("OCCT WASM initialized successfully.");
+                        logToScreen("OCCT Ready.");
                         resolve(occt);
                     }).catch((err) => {
-                        logToScreen("OCCT Init Error: " + err, 'error');
+                        logToScreen("Init Failed: " + err, 'error');
                         reject(err);
                     });
                 };
                 script.onerror = (err) => {
-                    logToScreen("Failed to load OCCT script from CDN.", 'error');
+                    logToScreen("Network Error: Failed to load OCCT.", 'error');
                     reject(err);
                 };
             });
@@ -420,7 +603,7 @@
             const gl = canvas.getContext('webgl', { powerPreference: 'high-performance' }) ||
                 canvas.getContext('experimental-webgl', { powerPreference: 'high-performance' });
 
-            if (!gl) return { error: "WebGL not supported" };
+            if (!gl) return { error: "WebGL Unsupported" };
 
             let vendor = gl.getParameter(gl.VENDOR);
             let renderer = gl.getParameter(gl.RENDERER);
@@ -474,30 +657,29 @@
         const gpuInfo = getGPUInfo();
 
         if (gpuInfo.error) {
-            statusText.textContent = "WebGL Error";
-            rendererEl.textContent = gpuInfo.error;
+            statusText.textContent = "Error";
+            statusText.style.color = "#ff4444";
+            rendererEl.textContent = "N/A";
         } else {
             statusDot.classList.add('status-active');
-            statusText.textContent = "Hardware Acceleration Active";
+            statusText.textContent = "Active";
+            statusText.style.color = "#ff006e";
             rendererEl.textContent = gpuInfo.renderer;
             rendererEl.title = `Full: ${gpuInfo.fullRenderer}`;
             vendorEl.textContent = gpuInfo.vendor;
-            console.log('GPU Detection Results:');
-            console.log('  Vendor:', gpuInfo.vendor);
-            console.log('  Renderer:', gpuInfo.renderer);
-            console.log('  Full String:', gpuInfo.fullRenderer);
         }
 
         const container = document.getElementById('canvas-container');
         const scene = new THREE.Scene();
-        scene.background = new THREE.Color(0x0a0a0a);
+        scene.background = new THREE.Color(0x050505); // Matching body gradient start
 
         const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 10000);
         camera.position.set(100, 100, 100);
 
         const renderer = new THREE.WebGLRenderer({
             antialias: true,
-            powerPreference: 'high-performance'
+            powerPreference: 'high-performance',
+            alpha: true // Allow CSS background to show through if needed
         });
         renderer.setSize(window.innerWidth, window.innerHeight);
         renderer.setPixelRatio(window.devicePixelRatio);
@@ -529,7 +711,7 @@
         dirLight2.position.set(-10, -5, -10);
         scene.add(dirLight2);
 
-        let gridHelper = new THREE.GridHelper(500, 50, 0x444444, 0x222222);
+        let gridHelper = new THREE.GridHelper(500, 50, 0x333333, 0x111111);
         scene.add(gridHelper);
 
         // Material controls
@@ -583,26 +765,26 @@
 
             fileNameDisplay.textContent = file.name;
             loadingOverlay.style.display = 'flex';
-            logToScreen(`Loading file: ${file.name} (${file.size} bytes)`);
+            logToScreen(`Loading: ${file.name} (${(file.size / 1024 / 1024).toFixed(2)} MB)`);
 
             try {
                 const occtInstance = await initOCCT();
 
-                logToScreen("Reading file buffer...");
+                logToScreen("Reading buffer...");
                 const buffer = await file.arrayBuffer();
 
-                logToScreen("Parsing STEP data...");
+                logToScreen("Parsing STEP structure...");
                 const fileData = new Uint8Array(buffer);
                 const result = occtInstance.ReadStepFile(fileData, null);
 
                 if (!result) {
-                    throw new Error("Parser returned null result.");
+                    throw new Error("Parser returned null.");
                 }
                 if (!result.meshes || result.meshes.length === 0) {
-                    throw new Error("No meshes found in STEP file.");
+                    throw new Error("No geometry found.");
                 }
 
-                logToScreen(`Success! Found ${result.meshes.length} meshes.`);
+                logToScreen(`Success: ${result.meshes.length} mesh(es) extracted.`);
 
                 // Remove old model
                 const toRemove = [];
@@ -647,7 +829,7 @@
                 const center = box.getCenter(new THREE.Vector3());
                 const size = box.getSize(new THREE.Vector3());
 
-                logToScreen(`Model Size: ${size.x.toFixed(1)} x ${size.y.toFixed(1)} x ${size.z.toFixed(1)}`);
+                logToScreen(`Dimensions: ${size.x.toFixed(1)} x ${size.y.toFixed(1)} x ${size.z.toFixed(1)}`);
 
                 group.position.sub(center);
 
@@ -657,11 +839,11 @@
                 scene.remove(gridHelper);
                 const gridSize = Math.max(maxDim * 2, 100);
                 const gridDivisions = Math.max(Math.floor(gridSize / 10), 10);
-                gridHelper = new THREE.GridHelper(gridSize, gridDivisions, 0x444444, 0x222222);
+                gridHelper = new THREE.GridHelper(gridSize, gridDivisions, 0x333333, 0x111111);
                 scene.add(gridHelper);
 
                 if (maxDim === 0 || !isFinite(maxDim)) {
-                    logToScreen("Model size is zero or invalid.", 'warn');
+                    logToScreen("Warning: Zero size model.", 'warn');
                 } else {
                     const fov = camera.fov * (Math.PI / 180);
                     let cameraZ = Math.abs(maxDim / 2 / Math.tan(fov / 2));
@@ -669,7 +851,6 @@
 
                     cameraZ = Math.max(cameraZ, maxDim * 1.5);
 
-                    logToScreen(`Camera distance: ${cameraZ.toFixed(2)}`);
                     camera.position.set(cameraZ, cameraZ, cameraZ);
                     camera.lookAt(0, 0, 0);
                     controls.target.set(0, 0, 0);
@@ -678,12 +859,12 @@
 
                 scene.add(group);
                 currentModelGroup = group;
-                logToScreen("Model added to scene.");
+                logToScreen("Render complete.");
 
             } catch (err) {
                 console.error(err);
                 logToScreen("Error: " + err.message, 'error');
-                alert("Error loading STEP file: " + err.message);
+                alert("Failed: " + err.message);
             } finally {
                 loadingOverlay.style.display = 'none';
             }
