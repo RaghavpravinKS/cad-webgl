@@ -1,0 +1,720 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>STEP File Viewer & GPU Stats</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background: linear-gradient(135deg, #0a0a0a 0%, #1a0a1a 100%);
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            color: white;
+        }
+
+        #canvas-container {
+            width: 100vw;
+            height: 100vh;
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 1;
+        }
+
+        #ui-layer {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            z-index: 2;
+            background: rgba(255, 255, 255, 0.08);
+            backdrop-filter: blur(20px);
+            padding: 24px;
+            border-radius: 20px;
+            border: 1px solid rgba(255, 0, 110, 0.3);
+            box-shadow: 0 8px 32px 0 rgba(255, 0, 110, 0.2);
+            max-width: 350px;
+            pointer-events: none;
+        }
+
+        #controls-layer {
+            position: absolute;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 3;
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(20px);
+            padding: 15px 25px;
+            border-radius: 30px;
+            border: 1px solid rgba(255, 0, 110, 0.3);
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .material-controls {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            padding: 8px 15px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 20px;
+            border: 1px solid rgba(255, 0, 110, 0.2);
+        }
+
+        .material-controls label {
+            font-size: 0.8rem;
+            color: rgba(255, 255, 255, 0.7);
+            font-weight: 500;
+        }
+
+        .material-controls select {
+            background: rgba(0, 0, 0, 0.5);
+            color: #fff;
+            border: 1px solid rgba(255, 0, 110, 0.3);
+            border-radius: 8px;
+            padding: 6px 12px;
+            font-size: 0.85rem;
+            cursor: pointer;
+            outline: none;
+        }
+
+        .material-controls select:hover {
+            border-color: #ff006e;
+        }
+
+        .material-controls input[type="color"] {
+            width: 40px;
+            height: 40px;
+            border: 2px solid rgba(255, 0, 110, 0.3);
+            border-radius: 50%;
+            cursor: pointer;
+            background: none;
+            outline: none;
+        }
+
+        .material-controls input[type="color"]:hover {
+            border-color: #ff006e;
+        }
+
+        #controls-hint {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            z-index: 2;
+            background: rgba(255, 255, 255, 0.08);
+            backdrop-filter: blur(20px);
+            padding: 18px;
+            border-radius: 16px;
+            border: 1px solid rgba(255, 0, 110, 0.3);
+            font-size: 0.85rem;
+            max-width: 220px;
+        }
+
+        h1 {
+            margin: 0 0 12px 0;
+            font-size: 1.3rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, #ff006e, #8338ec);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            letter-spacing: -0.5px;
+        }
+
+        .stat-item {
+            margin-bottom: 10px;
+            font-size: 0.9rem;
+            line-height: 1.5;
+        }
+
+        .label {
+            color: rgba(255, 255, 255, 0.5);
+            font-size: 0.75rem;
+            display: block;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            font-weight: 600;
+        }
+
+        .value {
+            font-weight: 500;
+            color: #fff;
+            margin-top: 2px;
+        }
+
+        .status-indicator {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background-color: #ff4444;
+            margin-right: 8px;
+        }
+
+        .status-active {
+            background-color: #ff006e;
+            box-shadow: 0 0 15px #ff006e;
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.6;
+            }
+        }
+
+        input[type="file"] {
+            display: none;
+        }
+
+        .custom-file-upload {
+            border: 2px solid #ff006e;
+            display: inline-block;
+            padding: 12px 24px;
+            cursor: pointer;
+            border-radius: 30px;
+            font-size: 0.95rem;
+            font-weight: 600;
+            color: #ff006e;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            background: rgba(255, 0, 110, 0.1);
+            letter-spacing: 0.3px;
+        }
+
+        .custom-file-upload:hover {
+            background: linear-gradient(135deg, #ff006e, #8338ec);
+            color: #fff;
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(255, 0, 110, 0.4);
+        }
+
+        #loading-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.85);
+            z-index: 10;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            display: none;
+        }
+
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid rgba(255, 255, 255, 0.1);
+            border-top: 4px solid #ff006e;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin-bottom: 20px;
+        }
+
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
+        #logs-console {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            width: 420px;
+            max-height: 220px;
+            background: rgba(0, 0, 0, 0.9);
+            color: #ff006e;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 11px;
+            overflow: hidden;
+            padding: 12px;
+            border-radius: 12px;
+            pointer-events: auto;
+            z-index: 100;
+            display: none;
+            border: 1px solid rgba(255, 0, 110, 0.3);
+        }
+
+        #logs-content {
+            max-height: 180px;
+            overflow-y: auto;
+        }
+
+        #logs-content::-webkit-scrollbar {
+            display: none;
+        }
+
+        #logs-content {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="ui-layer">
+        <h1>GPU & STEP Viewer</h1>
+        <div class="stat-item">
+            <span class="label">Status</span>
+            <div style="display: flex; align-items: center; margin-top: 4px;">
+                <span id="status-dot" class="status-indicator"></span>
+                <span id="status-text" class="value">Initializing...</span>
+            </div>
+        </div>
+        <div class="stat-item">
+            <span class="label">GPU Renderer</span>
+            <span id="gpu-renderer" class="value" style="cursor: help;"
+                title="Hover for full renderer string">Detecting...</span>
+        </div>
+        <div class="stat-item">
+            <span class="label">Vendor</span>
+            <span id="gpu-vendor" class="value">Detecting...</span>
+        </div>
+        <div class="stat-item">
+            <span class="label">FPS</span>
+            <span id="fps-counter" class="value">0</span>
+        </div>
+    </div>
+
+    <div id="controls-hint">
+        <div
+            style="font-weight: 700; margin-bottom: 10px; background: linear-gradient(135deg, #ff006e, #8338ec); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;">
+            Controls</div>
+        <div style="margin-bottom: 6px; font-size: 0.8rem;">🖱️ <strong>Left Drag:</strong> Rotate</div>
+        <div style="margin-bottom: 6px; font-size: 0.8rem;">🖱️ <strong>Right Drag:</strong> Pan</div>
+        <div style="margin-bottom: 6px; font-size: 0.8rem;">🖱️ <strong>Middle Drag:</strong> Zoom</div>
+        <div style="font-size: 0.8rem;">🖱️ <strong>Scroll:</strong> Zoom In/Out</div>
+    </div>
+
+    <div id="controls-layer">
+        <label for="file-upload" class="custom-file-upload">
+            📂 Open STEP File
+        </label>
+        <input id="file-upload" type="file" accept=".step,.stp" />
+        <span id="file-name" style="font-size: 0.85rem; color: rgba(255,255,255,0.6);">No file selected</span>
+
+        <div class="material-controls">
+            <label for="material-type">Material:</label>
+            <select id="material-type">
+                <option value="normal">Normal (Rainbow)</option>
+                <option value="standard">Standard</option>
+                <option value="phong">Phong</option>
+                <option value="lambert">Lambert</option>
+                <option value="wireframe">Wireframe</option>
+            </select>
+        </div>
+
+        <div class="material-controls">
+            <label for="model-color">Color:</label>
+            <input type="color" id="model-color" value="#ff006e" />
+        </div>
+    </div>
+
+    <div id="loading-overlay">
+        <div class="spinner"></div>
+        <div id="loading-text" style="font-size: 1.1rem; font-weight: 500;">Processing STEP file...</div>
+    </div>
+
+    <div id="logs-console">
+        <div style="margin-bottom: 8px;"><strong style="color: #8338ec;">Logs</strong> <button
+                onclick="document.getElementById('logs-console').style.display='none'"
+                style="float:right; cursor:pointer; background:none; border:none; color:#fff; font-size: 16px;">✕</button>
+        </div>
+        <div id="logs-content"></div>
+    </div>
+
+    <div id="canvas-container"></div>
+
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+        const logsConsole = document.getElementById('logs-console');
+        const logsContent = document.getElementById('logs-content');
+
+        function logToScreen(msg, type = 'info') {
+            logsConsole.style.display = 'block';
+            const div = document.createElement('div');
+            div.style.color = type === 'error' ? '#ff4444' : (type === 'warn' ? '#ffaa00' : '#ff006e');
+            div.style.marginBottom = '6px';
+            div.style.paddingBottom = '6px';
+            div.style.borderBottom = '1px solid rgba(255,255,255,0.1)';
+            div.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+            logsContent.appendChild(div);
+            logsContent.scrollTop = logsContent.scrollHeight;
+            console.log(msg);
+        }
+
+        window.onerror = function (msg, url, lineNo, columnNo, error) {
+            logToScreen(`Global Error: ${msg} at line ${lineNo}`, 'error');
+            return false;
+        };
+
+        let occt = null;
+
+        async function initOCCT() {
+            if (occt) return occt;
+
+            logToScreen("Initializing OCCT...");
+
+            const script = document.createElement('script');
+            script.src = "https://cdn.jsdelivr.net/npm/occt-import-js@0.0.16/dist/occt-import-js.js";
+            document.body.appendChild(script);
+
+            return new Promise((resolve, reject) => {
+                script.onload = () => {
+                    logToScreen("OCCT script loaded. Initializing WASM...");
+                    occtimportjs({
+                        locateFile: (name) => {
+                            if (name.endsWith('.wasm')) {
+                                return 'https://cdn.jsdelivr.net/npm/occt-import-js@0.0.16/dist/occt-import-js.wasm';
+                            }
+                            return name;
+                        }
+                    }).then((instance) => {
+                        occt = instance;
+                        logToScreen("OCCT WASM initialized successfully.");
+                        resolve(occt);
+                    }).catch((err) => {
+                        logToScreen("OCCT Init Error: " + err, 'error');
+                        reject(err);
+                    });
+                };
+                script.onerror = (err) => {
+                    logToScreen("Failed to load OCCT script from CDN.", 'error');
+                    reject(err);
+                };
+            });
+        }
+
+        // GPU detection using WEBGL_debug_renderer_info extension
+        function getGPUInfo() {
+            const canvas = document.createElement('canvas');
+            const gl = canvas.getContext('webgl', { powerPreference: 'high-performance' }) ||
+                canvas.getContext('experimental-webgl', { powerPreference: 'high-performance' });
+
+            if (!gl) return { error: "WebGL not supported" };
+
+            let vendor = gl.getParameter(gl.VENDOR);
+            let renderer = gl.getParameter(gl.RENDERER);
+
+            // Use WEBGL_debug_renderer_info extension to get unmasked GPU info
+            const debugInfo = gl.getExtension('WEBGL_debug_renderer_info');
+            if (debugInfo) {
+                const unmaskedVendor = gl.getParameter(debugInfo.UNMASKED_VENDOR_WEBGL);
+                const unmaskedRenderer = gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL);
+
+                if (unmaskedVendor) vendor = unmaskedVendor;
+                if (unmaskedRenderer) renderer = unmaskedRenderer;
+            }
+
+            // Extract clean GPU name
+            let gpuName = renderer;
+
+            // Pattern 1: New ANGLE format (Chrome)
+            const angleNewMatch = renderer.match(/ANGLE \((?:NVIDIA|AMD|Intel)[^,]*,\s*([^(]+)/);
+            if (angleNewMatch) {
+                gpuName = angleNewMatch[1].trim();
+            } else {
+                // Pattern 2: Old ANGLE format
+                const angleOldMatch = renderer.match(/ANGLE \(([^)]+)\)/);
+                if (angleOldMatch) {
+                    gpuName = angleOldMatch[1];
+                    gpuName = gpuName.replace(/Direct3D\d+.*$/i, '').trim();
+                    gpuName = gpuName.replace(/OpenGL.*$/i, '').trim();
+                    gpuName = gpuName.replace(/vs_\d+_\d+.*$/i, '').trim();
+                    gpuName = gpuName.replace(/ps_\d+_\d+.*$/i, '').trim();
+                }
+            }
+
+            // Pattern 3: Firefox direct format
+            if (!angleNewMatch && !angleOldMatch && renderer.includes('NVIDIA')) {
+                gpuName = renderer.replace(/\s*\/.*$/, '').trim();
+            }
+
+            return {
+                vendor,
+                renderer: gpuName,
+                fullRenderer: renderer
+            };
+        }
+
+        const statusDot = document.getElementById('status-dot');
+        const statusText = document.getElementById('status-text');
+        const rendererEl = document.getElementById('gpu-renderer');
+        const vendorEl = document.getElementById('gpu-vendor');
+
+        const gpuInfo = getGPUInfo();
+
+        if (gpuInfo.error) {
+            statusText.textContent = "WebGL Error";
+            rendererEl.textContent = gpuInfo.error;
+        } else {
+            statusDot.classList.add('status-active');
+            statusText.textContent = "Hardware Acceleration Active";
+            rendererEl.textContent = gpuInfo.renderer;
+            rendererEl.title = `Full: ${gpuInfo.fullRenderer}`;
+            vendorEl.textContent = gpuInfo.vendor;
+            console.log('GPU Detection Results:');
+            console.log('  Vendor:', gpuInfo.vendor);
+            console.log('  Renderer:', gpuInfo.renderer);
+            console.log('  Full String:', gpuInfo.fullRenderer);
+        }
+
+        const container = document.getElementById('canvas-container');
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x0a0a0a);
+
+        const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 10000);
+        camera.position.set(100, 100, 100);
+
+        const renderer = new THREE.WebGLRenderer({
+            antialias: true,
+            powerPreference: 'high-performance'
+        });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(window.devicePixelRatio);
+        renderer.useLegacyLights = false;
+        container.appendChild(renderer.domElement);
+
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+
+        controls.mouseButtons = {
+            LEFT: THREE.MOUSE.ROTATE,
+            MIDDLE: THREE.MOUSE.DOLLY,
+            RIGHT: THREE.MOUSE.PAN
+        };
+
+        controls.zoomSpeed = 1.2;
+        controls.rotateSpeed = 1.0;
+        controls.panSpeed = 0.8;
+
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+        scene.add(ambientLight);
+
+        const dirLight = new THREE.DirectionalLight(0xffffff, 1);
+        dirLight.position.set(10, 10, 10);
+        scene.add(dirLight);
+
+        const dirLight2 = new THREE.DirectionalLight(0xffffff, 0.5);
+        dirLight2.position.set(-10, -5, -10);
+        scene.add(dirLight2);
+
+        let gridHelper = new THREE.GridHelper(500, 50, 0x444444, 0x222222);
+        scene.add(gridHelper);
+
+        // Material controls
+        const materialTypeSelect = document.getElementById('material-type');
+        const modelColorPicker = document.getElementById('model-color');
+        let currentModelGroup = null;
+
+        function createMaterial(type, color) {
+            const colorValue = new THREE.Color(color);
+
+            switch (type) {
+                case 'normal':
+                    return new THREE.MeshNormalMaterial({ side: THREE.DoubleSide });
+                case 'standard':
+                    return new THREE.MeshStandardMaterial({ color: colorValue, side: THREE.DoubleSide, metalness: 0.3, roughness: 0.6 });
+                case 'phong':
+                    return new THREE.MeshPhongMaterial({ color: colorValue, side: THREE.DoubleSide, shininess: 80 });
+                case 'lambert':
+                    return new THREE.MeshLambertMaterial({ color: colorValue, side: THREE.DoubleSide });
+                case 'wireframe':
+                    return new THREE.MeshBasicMaterial({ color: colorValue, wireframe: true, side: THREE.DoubleSide });
+                default:
+                    return new THREE.MeshNormalMaterial({ side: THREE.DoubleSide });
+            }
+        }
+
+        function updateMaterial() {
+            if (!currentModelGroup) return;
+
+            const materialType = materialTypeSelect.value;
+            const color = modelColorPicker.value;
+            const newMaterial = createMaterial(materialType, color);
+
+            currentModelGroup.traverse((child) => {
+                if (child.isMesh) {
+                    child.material = newMaterial;
+                }
+            });
+        }
+
+        materialTypeSelect.addEventListener('change', updateMaterial);
+        modelColorPicker.addEventListener('input', updateMaterial);
+
+        const fileInput = document.getElementById('file-upload');
+        const fileNameDisplay = document.getElementById('file-name');
+        const loadingOverlay = document.getElementById('loading-overlay');
+
+        fileInput.addEventListener('change', async (event) => {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            fileNameDisplay.textContent = file.name;
+            loadingOverlay.style.display = 'flex';
+            logToScreen(`Loading file: ${file.name} (${file.size} bytes)`);
+
+            try {
+                const occtInstance = await initOCCT();
+
+                logToScreen("Reading file buffer...");
+                const buffer = await file.arrayBuffer();
+
+                logToScreen("Parsing STEP data...");
+                const fileData = new Uint8Array(buffer);
+                const result = occtInstance.ReadStepFile(fileData, null);
+
+                if (!result) {
+                    throw new Error("Parser returned null result.");
+                }
+                if (!result.meshes || result.meshes.length === 0) {
+                    throw new Error("No meshes found in STEP file.");
+                }
+
+                logToScreen(`Success! Found ${result.meshes.length} meshes.`);
+
+                // Remove old model
+                const toRemove = [];
+                scene.traverse((child) => {
+                    if (child.isMesh && child !== gridHelper) toRemove.push(child);
+                });
+                toRemove.forEach(child => scene.remove(child));
+                if (currentModelGroup) {
+                    scene.remove(currentModelGroup);
+                }
+
+                const group = new THREE.Group();
+                const materialType = materialTypeSelect.value;
+                const color = modelColorPicker.value;
+                const material = createMaterial(materialType, color);
+
+                for (const meshData of result.meshes) {
+                    const geometry = new THREE.BufferGeometry();
+
+                    if (meshData.attributes.position && meshData.attributes.position.array) {
+                        const posArray = new Float32Array(meshData.attributes.position.array);
+                        geometry.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
+                    }
+
+                    if (meshData.attributes.normal && meshData.attributes.normal.array) {
+                        const normArray = new Float32Array(meshData.attributes.normal.array);
+                        geometry.setAttribute('normal', new THREE.BufferAttribute(normArray, 3));
+                    } else {
+                        geometry.computeVertexNormals();
+                    }
+
+                    if (meshData.index && meshData.index.array) {
+                        const idxArray = new Uint32Array(meshData.index.array);
+                        geometry.setIndex(new THREE.BufferAttribute(idxArray, 1));
+                    }
+
+                    const mesh = new THREE.Mesh(geometry, material);
+                    group.add(mesh);
+                }
+
+                const box = new THREE.Box3().setFromObject(group);
+                const center = box.getCenter(new THREE.Vector3());
+                const size = box.getSize(new THREE.Vector3());
+
+                logToScreen(`Model Size: ${size.x.toFixed(1)} x ${size.y.toFixed(1)} x ${size.z.toFixed(1)}`);
+
+                group.position.sub(center);
+
+                const maxDim = Math.max(size.x, size.y, size.z);
+
+                // Update grid size based on model
+                scene.remove(gridHelper);
+                const gridSize = Math.max(maxDim * 2, 100);
+                const gridDivisions = Math.max(Math.floor(gridSize / 10), 10);
+                gridHelper = new THREE.GridHelper(gridSize, gridDivisions, 0x444444, 0x222222);
+                scene.add(gridHelper);
+
+                if (maxDim === 0 || !isFinite(maxDim)) {
+                    logToScreen("Model size is zero or invalid.", 'warn');
+                } else {
+                    const fov = camera.fov * (Math.PI / 180);
+                    let cameraZ = Math.abs(maxDim / 2 / Math.tan(fov / 2));
+                    cameraZ *= 3.5;
+
+                    cameraZ = Math.max(cameraZ, maxDim * 1.5);
+
+                    logToScreen(`Camera distance: ${cameraZ.toFixed(2)}`);
+                    camera.position.set(cameraZ, cameraZ, cameraZ);
+                    camera.lookAt(0, 0, 0);
+                    controls.target.set(0, 0, 0);
+                    controls.update();
+                }
+
+                scene.add(group);
+                currentModelGroup = group;
+                logToScreen("Model added to scene.");
+
+            } catch (err) {
+                console.error(err);
+                logToScreen("Error: " + err.message, 'error');
+                alert("Error loading STEP file: " + err.message);
+            } finally {
+                loadingOverlay.style.display = 'none';
+            }
+        });
+
+        let frameCount = 0;
+        let lastTime = performance.now();
+        const fpsEl = document.getElementById('fps-counter');
+
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            renderer.render(scene, camera);
+
+            frameCount++;
+            const currentTime = performance.now();
+            if (currentTime - lastTime >= 1000) {
+                fpsEl.textContent = frameCount;
+                frameCount = 0;
+                lastTime = currentTime;
+            }
+        }
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        animate();
+    </script>
+</body>
+
+</html>
